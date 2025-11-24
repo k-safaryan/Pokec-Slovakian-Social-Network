@@ -134,25 +134,6 @@ class QueryEngine:
         
         print("\nAll predefined queries completed.")
 
-if __name__ == "__main__":
-    DATA_FILE = "soc-Pokec.csv"
-    RELATIONSHIPS_FILE = "soc-Pokec-relationships.txt"
-    
-    try:
-        with open(RELATIONSHIPS_FILE, 'r'):
-            pass
-    except FileNotFoundError:
-        print(f"Warning: {RELATIONSHIPS_FILE} not found. Creating a dummy file for testing.")
-        with open(RELATIONSHIPS_FILE, 'w') as f:
-            f.write("1 2\n") 
-            f.write("1 16\n")
-            f.write("1 17\n")
-            f.write("1 18\n")
-            f.write("2 3\n")
-            f.write("3 4\n")
-            f.write("16 17\n")
-            f.write("17 18\n")
-            f.write("16 18\n")
+engine = QueryEngine(DATA_FILE, RELATIONSHIPS_FILE)
+engine.run_all_queries()
 
-    engine = QueryEngine(DATA_FILE, RELATIONSHIPS_FILE)
-    engine.run_all_queries()
