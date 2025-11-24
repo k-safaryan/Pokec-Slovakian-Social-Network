@@ -1,106 +1,101 @@
 class AVLNode:
-    def __init__(self, key, record_id):
-        self.key = key          # The indexing key (e.g., index_score)
-        self.record_ids = [record_id]
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
         self.left = None
         self.right = None
         self.height = 1
-        self.balance = 0
 
 class AVLTree:
     def __init__(self):
         self.root = None
+        self.size = 0
 
-    def _get_height(self, node):
-        return node.height if node else 0
+    def get_height(self, node):
+        if not node:
+            return 0
+        return node.height
 
-    def _update_height(self, node):
-        node.height = 1 + max(self._get_height(node.left), self._get_height(node.right))
-        node.balance = self._get_height(node.left) - self._get_height(node.right)
+    def get_balance(self, node):
+        if not node:
+            return 0
+        return self.get_height(node.left) - self.get_height(node.right)
 
-    def _rotate_left(self, z):
-        y = z.right
+    def update_height(self, node):
+        node.height = 1 + max(self.get_height(node.left), self.get_height(node.right))
+
+    def rotate_right(self, y):
+        x = y.left
+        T2 = x.right
+
+        x.right = y
+        y.left = T2
+
+        self.update_height(y)
+        self.update_height(x)
+
+        return x
+
+    def rotate_left(self, x):
+        y = x.right
         T2 = y.left
-        y.left = z
-        z.right = T2
-        self._update_height(z)
-        self._update_height(y)
+
+        y.left = x
+        x.right = T2
+
+        self.update_height(x)
+        self.update_height(y)
+
         return y
 
-    def _rotate_right(self, z):
-        y = z.left
-        T3 = y.right
-        y.right = z
-        z.left = T3
-        self._update_height(z)
-        self._update_height(y)
-        return y
-    
-    def insert(self, key, record_id):
-        self.root = self._insert_recursive(self.root, key, record_id)
-
-    def _insert_recursive(self, node, key, record_id):
-        if not node:
-            return AVLNode(key, record_id)
-
-        if key < node.key:
-            node.left = self._insert_recursive(node.left, key, record_id)
-        elif key > node.key:
-            node.right = self._insert_recursive(node.right, key, record_id)
+    def insert(self, root, key, user_id):
+        if not root:
+            self.size += 1
+            return AVLNode(key, [user_id])
+        
+        if key < root.key:
+            root.left = self.insert(root.left, key, user_id)
+        elif key > root.key:
+            root.right = self.insert(root.right, key, user_id)
         else:
-            if record_id not in node.record_ids:
-                node.record_ids.append(record_id)
-            return node
+            root.value.append(user_id)
+            return root
 
-        self._update_height(node)
+        self.update_height(root)
 
-        balance = node.balance
+        balance = self.get_balance(root)
 
-        if balance > 1 and key < node.left.key:
-            return self._rotate_right(node)
-        if balance < -1 and key > node.right.key:
-            return self._rotate_left(node)
-        if balance > 1 and key > node.left.key:
-            node.left = self._rotate_left(node.left)
-            return self._rotate_right(node)
-        if balance < -1 and key < node.right.key:
-            node.right = self._rotate_right(node.right)
-            return self._rotate_left(node)
+        if balance > 1 and key < root.left.key:
+            return self.rotate_right(root)
 
-        return node
+        if balance < -1 and key > root.right.key:
+            return self.rotate_left(root)
 
-    def search(self, key):
-        node = self._search_recursive(self.root, key)
-        return node.record_ids if node else None
+        if balance > 1 and key > root.left.key:
+            root.left = self.rotate_left(root.left)
+            return self.rotate_right(root)
 
-    def _search_recursive(self, node, key):
-        if not node or node.key == key:
-            return node
-        if key < node.key:
-            return self._search_recursive(node.left, key)
-        return self._search_recursive(node.right, key)
+        if balance < -1 and key < root.right.key:
+            root.right = self.rotate_right(root.right)
+            return self.rotate_left(root)
 
-    def range_query(self, min_key, max_key):
-        results = []
-        self._range_query_recursive(self.root, min_key, max_key, results)
-        return results
+        return root
+    
+    def add(self, key, user_id):
+        self.root = self.insert(self.root, key, user_id)
 
-    def _range_query_recursive(self, node, min_key, max_key, results):
-        if not node:
+    def range_search(self, root, low, high, results):
+        if root is None:
             return
 
-        if min_key < node.key:
-            self._range_query_recursive(node.left, min_key, max_key, results)
+        if root.key > low:
+            self.range_search(root.left, low, high, results)
 
-        if min_key <= node.key <= max_key:
-            results.extend(node.record_ids)
+        if low <= root.key <= high:
+            results.extend(root.value)
 
-        if max_key > node.key:
-            self._range_query_recursive(node.right, min_key, max_key, results)
-
-    def delete_record_id(self, key, record_id):
-        node = self._search_recursive(self.root, key)
-        if node:
+        if root.key < high:
+            self.range_search(root.right, low, high, results)
             try:
                 node.record_ids.remove(record_id)
                 return True
