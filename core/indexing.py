@@ -1,5 +1,3 @@
-import collections
-
 class _Node:
     def __init__(self, key, value, height=1, left=None, right=None, parent=None):
         self.key = key
