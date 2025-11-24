@@ -76,7 +76,7 @@ class AVLTree:
 
         self._update_height(node)
         balance = self._balance_factor(node)
-
+        
         if balance > 1:
             if self._balance_factor(node.left) < 0:
                 node.left = self._rotate_left(node.left)
