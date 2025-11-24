@@ -1,16 +1,19 @@
 import time
 from storage import Storage
+from graph import Graph
 
 class QueryEngine:
     def __init__(self, data_path, relationships_path):
         self.data_path = data_path
         self.relationships_path = relationships_path
-        self.storage = Storage(data_path, relationships_path)
+        self.storage = Storage(data_path)
+        self.graph_manager = Graph(relationships_path)
 
     def initialize_data(self):
         print("Starting data initialization...")
         start_time = time.time()
         self.storage.initialize()
+        self.graph_manager.initialize()
         end_time = time.time()
         print(f"Data initialization complete. Time taken: {end_time - start_time:.4f} seconds.")
 
@@ -33,7 +36,7 @@ class QueryEngine:
     def run_shortest_path_query(self, start_id, end_id):
         print(f"\n--- Running Shortest Path Query: {start_id} -> {end_id} ---")
         start_time = time.time()
-        path = self.storage.find_shortest_path(start_id, end_id)
+        path = self.graph_manager.find_shortest_path(start_id, end_id)
         end_time = time.time()
         time_taken = end_time - start_time
 
@@ -58,6 +61,7 @@ class QueryEngine:
         new_user_data = {'user_id': new_user_id, 'gender': 'Female', 'age': 25, 'eye_color': 'blue', 'education': 'uni', 'languages': 'en', 'music': 'rock'}
         print(f"\nAttempting to insert new user ID: {new_user_id} (Age 25)")
         self.storage.add_user(new_user_data)
+        self.graph_manager.add_edge(new_user_id, 1) 
         
         check_user = self.storage.get_user_by_id(new_user_id)
         print(f"Insertion successful. User data: {check_user}")
@@ -71,7 +75,8 @@ class QueryEngine:
 
         # 3. Deletion
         print(f"\nAttempting to delete user ID: {new_user_id}")
-        success = self.storage.delete_user(new_user_id)
+        self.storage.delete_user(new_user_id)
+        success = self.graph_manager.remove_user(new_user_id)
         
         check_user = self.storage.get_user_by_id(new_user_id)
         print(f"Deletion successful: {success}. User check in hash map: {check_user}")
