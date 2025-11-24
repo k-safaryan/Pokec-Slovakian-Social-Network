@@ -1,6 +1,6 @@
 import csv
 import time
-from avl_tree_no_comments import AVLTree
+from indexing import AVLTree
 
 class Storage:
     def __init__(self, data_path, relationships_path):
@@ -19,7 +19,7 @@ class Storage:
             
             for row in reader:
                 try:
-                    user_id = int(row[0])
+                    user_id = int(float(row[0]))
                     user = {
                         'user_id': user_id,
                         'gender': row[1] if len(row) > 1 else 'Unknown',
