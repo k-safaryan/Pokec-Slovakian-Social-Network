@@ -1,111 +1,86 @@
 import collections
 
 class Graph:
-    def __init__(self, relationships_path):
-        self.relationships_path = relationships_path
-        self.graph = collections.defaultdict(list)
-        self.users = set()
+    def __init__(self):
+        self.adj = collections.defaultdict(list)
+        self.parents = {} 
+        self.nodes = set()
 
-    def initialize(self):
-        self._load_relationships()
+    def add_edge(self, manager_id, employee_id):
+        self.adj[manager_id].append(employee_id)
+        self.parents[employee_id] = manager_id 
+        self.nodes.add(manager_id)
+        self.nodes.add(employee_id)
 
-    def _load_relationships(self):
-        with open(self.relationships_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    u1, u2 = map(int, line.strip().split())
-                    self.graph[u1].append(u2)
-                    self.graph[u2].append(u1)
-                    self.users.add(u1)
-                    self.users.add(u2)
-                except ValueError:
-                    pass
+    def remove_node(self, node_id):
+        if node_id in self.parents:
+            del self.parents[node_id]
 
-    def add_edge(self, u1, u2):
-        if u2 not in self.graph[u1]:
-            self.graph[u1].append(u2)
-            self.users.add(u1)
-        if u1 not in self.graph[u2]:
-            self.graph[u2].append(u1)
-            self.users.add(u2)
+        if node_id in self.nodes:
+            self.nodes.remove(node_id)
 
-    def remove_user(self, user_id):
-        if user_id in self.graph:
-            for friend_id in list(self.graph[user_id]):
-                if friend_id in self.graph and user_id in self.graph[friend_id]:
-                    self.graph[friend_id].remove(user_id)
-            
-            del self.graph[user_id]
-            self.users.discard(user_id)
-            return True
-        return False
+        if node_id in self.adj:
+            del self.adj[node_id]
 
-    def find_shortest_path(self, start_id, end_id):
-        if start_id == end_id:
-            return [start_id]
-        if start_id not in self.graph or end_id not in self.graph:
-            return None
+        for manager_id, employees in list(self.adj.items()):
+            if node_id in employees:
+                employees.remove(node_id)
 
-        queue = collections.deque([start_id])
-        visited = {start_id}
-        parent = {start_id: None}
-        
-        while queue:
-            current_id = queue.popleft()
+    def get_neighbors(self, node_id):
+        return self.adj.get(node_id, [])
 
-            if current_id == end_id:
-                path = []
-                while current_id is not None:
-                    path.append(current_id)
-                    current_id = parent[current_id]
-                return path[::-1]
-
-            for neighbor_id in self.graph[current_id]:
-                if neighbor_id not in visited:
-                    visited.add(neighbor_id)
-                    parent[neighbor_id] = current_id
-                    queue.append(neighbor_id)
-        
-        return None
-
-    def depth_first_traversal(self, start_id):
-        if start_id not in self.graph:
+    def find_path_up_to_root(self, start_node):
+        if start_node not in self.nodes:
             return []
+            
+        path = [start_node]
+        current = start_node
         
-        visited = set()
+        while current in self.parents:
+            manager = self.parents[current]
+            path.append(manager)
+            current = manager
+
+        return path[::-1]
+
+    def bfs_traversal(self, start_node):
+        if start_node not in self.nodes:
+            return []
+
+        queue = collections.deque([start_node])
+        visited = {start_node}
         traversal_order = []
-        stack = [start_id]
-        [Image of Depth First Search (DFS) Traversal]
-        while stack:
-            current_id = stack.pop()
-            if current_id not in visited:
-                visited.add(current_id)
-                traversal_order.append(current_id)
-                for neighbor in sorted(self.graph[current_id], reverse=True):
-                    if neighbor not in visited:
-                        stack.append(neighbor)
+
+        while queue:
+            node = queue.popleft()
+            traversal_order.append(node)
+
+            for neighbor in self.adj.get(node, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
         
         return traversal_order
 
-    def calculate_local_clustering_coefficient(self, user_id):
-        neighbors = self.graph.get(user_id, [])
-        k = len(neighbors)
-        if k < 2:
-            return 0.0
+    def shortest_path(self, start_node, end_node):
+        if start_node == end_node:
+            return [start_node]
+        if start_node not in self.nodes or end_node not in self.nodes:
+            return None
 
-        max_edges = k * (k - 1) / 2
-        
-        existing_edges = 0
-        
-        for i in range(k):
-            for j in range(i + 1, k):
-                neighbor_u = neighbors[i]
-                neighbor_v = neighbors[j]
+        queue = collections.deque([(start_node, [start_node])])
+        visited = {start_node}
+
+        while queue:
+            current_node, path = queue.popleft()
+
+            for neighbor in self.adj.get(current_node, []):
+                if neighbor == end_node:
+                    return path + [end_node]
                 
-                if neighbor_v in self.graph.get(neighbor_u, []):
-                    existing_edges += 1
-        
-        return existing_edges / max_edges if max_edges > 0 else 0.0
-
-    def calculate_degree_centrality(self, user_id):
-        return len(self.graph.get(user_id, []))
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    new_path = path + [neighbor]
+                    queue.append((neighbor, new_path))
+                    
+        return None
