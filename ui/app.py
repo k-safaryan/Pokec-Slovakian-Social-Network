@@ -41,7 +41,7 @@ def load_data_and_engine():
 
 st.set_page_config(layout="wide", page_title="MiniDB: Pokec Social Network")
 
-st.title("DS115 MiniDB: Pokec Network Management System")
+st.title("DS & Algo Project(Group 7): Pokec Network Management System")
 
 storage, engine = load_data_and_engine()
 

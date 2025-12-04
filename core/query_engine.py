@@ -12,7 +12,7 @@ class QueryEngine:
             return None
         
         start_time = time.perf_counter()
-        record = self.storage.get_user_by_id(user_id)
+        record = self.storage.get_user_by_id(int(user_id))
         end_time = time.perf_counter()
         
         if record:
@@ -67,7 +67,30 @@ class QueryEngine:
             return None
         
         start_time = time.perf_counter()
-        path_ids = self.storage.hierarchy_graph.path_to_root(user_id)
+        
+        path_ids = []
+        current_id = int(user_id) # Ensure the starting ID is an integer
+        
+        while current_id is not None:
+            record = self.storage.get_user_by_id(current_id)
+            if record is None:
+                break
+                
+            path_ids.append(current_id)
+            
+            manager_id = record.get('manager_id')
+            
+            # Type safe casting for manager_id from hash map (which might be float or None)
+            if manager_id is not None:
+                manager_id = int(manager_id)
+            
+            if manager_id is None or manager_id == current_id:
+                break
+            
+            current_id = manager_id
+            
+        path_ids.reverse()
+        
         end_time = time.perf_counter()
         
         if path_ids:

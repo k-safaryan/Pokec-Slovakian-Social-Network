@@ -3,11 +3,9 @@ import sys
 import time
 from collections import deque
 
-# --- FINAL PATH FIX: Forces the current directory (project root) into the search path ---
 script_dir = os.path.dirname(os.path.abspath(__file__))
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir) 
-# --------------------------------------------------------------------------------------
 
 try:
     from core.storage import Storage
@@ -24,27 +22,21 @@ def find_valid_graph_ids(storage_instance: Storage):
     """Dynamically finds a connected pair of IDs for testing."""
     graph = storage_instance.hierarchy_graph
     
-    # 1. Find a manager (node with downstream connections)
     valid_managers = [node for node, reports in graph.adj.items() if reports]
     
     if not valid_managers:
         print("[DEBUG] CRITICAL: No user in the dataset has any direct reports. Cannot test graph.")
         return 0, 0, 0
     
-    # Use the first manager found as the starting point (Test ID A)
     manager_A = valid_managers[0]
     
-    # Use one of the manager's reports as Test ID B (guaranteed a path of length 1)
     employee_B = graph.adj[manager_A][0]
 
-    # Find a third node (C) that is 2 or more steps away from A for the shortest path check.
-    # This requires a quick BFS from the manager.
     far_node = employee_B
     queue = deque([employee_B])
     visited = {manager_A, employee_B}
     depth = 0
     
-    # Search for a node at least 2 steps away
     while queue and depth < 3:
         level_size = len(queue)
         depth += 1
@@ -55,11 +47,9 @@ def find_valid_graph_ids(storage_instance: Storage):
                     visited.add(neighbor)
                     far_node = neighbor
                     if depth >= 2:
-                        # Found a good candidate for the far node
                         return manager_A, employee_B, far_node
                     queue.append(neighbor)
     
-    # If a deep path isn't found, just use the direct report for the shortest path test.
     return manager_A, employee_B, employee_B 
 
 def run_system_check():
@@ -77,7 +67,6 @@ def run_system_check():
         print("CRITICAL LOGIC ERROR: Initialization failed.")
         return
 
-    # Dynamically find IDs that exist in the graph
     test_manager, test_direct_report, test_far_node = find_valid_graph_ids(storage)
     
     print("\n" + "=" * 60)
@@ -98,7 +87,6 @@ def run_system_check():
     print(f"\n[Check 3B] O(log N) Indexed Search for Age {test_age}:")
     engine.search_by_index_score(test_age)
 
-    # --- GRAPH TESTS using dynamically found IDs ---
     print(f"\n[Check 3C] Graph Pathfinding (BFS) between {test_manager} and {test_far_node}:")
     path_ids = storage.hierarchy_graph.shortest_path(test_manager, test_far_node)
     if path_ids:
@@ -111,7 +99,6 @@ def run_system_check():
     if reports:
         print(f"ID {test_manager} has {len(reports)} connections: {reports[:5]}...")
         
-        # Test Path to Root with a node known to be connected
         print(f"\n[Check 3E] Path to Root/CEO for connected ID {test_direct_report}:")
         path_to_root = engine.find_shortest_path_to_ceo(test_direct_report)
         if path_to_root:
