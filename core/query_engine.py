@@ -1,75 +1,96 @@
 import time
-from storage import Storage
+import pandas as pd
+from collections import Counter
 
 class QueryEngine:
-    def __init__(self, data_path):
-        self.data_path = data_path
-        self.storage = Storage(data_path)
+    def __init__(self, storage):
+        self.storage = storage
+        self.is_ready = storage.is_loaded
 
-    def initialize_data(self):
-        print("Starting data initialization...")
-        start_time = time.time()
-        self.storage.initialize()
-        end_time = time.time()
-        print(f"Data initialization complete. Time taken: {end_time - start_time:.4f} seconds.")
+    def get_record_by_id(self, user_id):
+        if not self.is_ready:
+            return None
+        
+        start_time = time.perf_counter()
+        record = self.storage.get_user_by_id(user_id)
+        end_time = time.perf_counter()
+        
+        if record:
+            print(f"Record {user_id} found in {(end_time - start_time) * 1000:.3f} ms (O(1) Hash Map lookup).")
+        else:
+            print(f"Record {user_id} not found.")
+        return record
 
-    def run_age_range_query(self, min_age, max_age):
-        print(f"\n--- Running Age Range Query: {min_age}-{max_age} ---")
-        start_time = time.time()
-        results = self.storage.search_by_age_range(min_age, max_age)
-        end_time = time.time()
-        time_taken = end_time - start_time
-        
-        print(f"Found {len(results)} users in age range {min_age}-{max_age}.")
-        print(f"Time taken for AVL Search: {time_taken:.6f} seconds.")
-        
-        print("\nFirst 5 results:")
-        for user in results[:5]:
-            print(f"  ID: {user['user_id']}, Age: {user['age']}, Gender: {user['gender']}")
+    def search_by_index_score(self, min_score, max_score=None):
+        if not self.is_ready:
+            return []
             
-        return results, time_taken
-
-    def run_dynamic_operations(self):
-        print("\n" + "="*50)
-        print("DYNAMIC OPERATIONS (Insertion, Modification, Deletion)")
-        print("="*50)
-
-        new_user_id = 9999999
-        new_user_data = {'user_id': new_user_id, 'gender': 'Female', 'age': 25, 'eye_color': 'blue', 'education': 'uni', 'languages': 'en', 'music': 'rock'}
-        print(f"\nAttempting to insert new user ID: {new_user_id} (Age 25)")
-        self.storage.add_user(new_user_data)
+        if max_score is None:
+            max_score = min_score
+            
+        start_time = time.perf_counter()
+        results = self.storage.search_by_age_range(min_score, max_score)
+        end_time = time.perf_counter()
         
-        check_user = self.storage.get_user_by_id(new_user_id)
-        print(f"Insertion successful. User data: {check_user}")
+        if min_score == max_score:
+            print(f"Found {len(results)} record(s) with age={min_score} in {(end_time - start_time) * 1000:.3f} ms (O(log N) AVL Tree lookup).")
         
-        print(f"\nAttempting to modify user ID: {new_user_id} (Change age from 25 to 28)")
-        self.storage.modify_user(new_user_id, {'age': 28, 'music': 'pop'})
+        return results
+
+    def compare_linear_search_by_age_range(self, min_age, max_age):
+        if not self.is_ready:
+            print("System not initialized.")
+            return
+
+        print(f"--- Performance Comparison for Age Range [{min_age}, {max_age}] ---")
+
+        start_linear = time.perf_counter()
+        linear_results = self.storage.linear_search_by_age_range(min_age, max_age)
+        end_linear = time.perf_counter()
+        linear_time_ms = (end_linear - start_linear) * 1000
+
+        start_indexed = time.perf_counter()
+        indexed_results = self.storage.search_by_age_range(min_age, max_age)
+        end_indexed = time.perf_counter()
+        indexed_time_ms = (end_indexed - start_indexed) * 1000
+
+        print(f"Linear Search: {len(linear_results)} records found in {linear_time_ms:.3f} ms (O(N) complexity).")
+        print(f"AVL Tree Search: {len(indexed_results)} records found in {indexed_time_ms:.3f} ms (O(log N + K) complexity).")
+
+        speedup = linear_time_ms / indexed_time_ms if indexed_time_ms > 0 else float('inf')
+        print(f"Conclusion: AVL Tree is {speedup:.1f}x faster than Linear Search.")
         
-        check_user = self.storage.get_user_by_id(new_user_id)
-        print(f"Modification successful. New Age: {check_user['age']}, New Music: {check_user['music']}")
+        return indexed_results
 
-        print(f"\nAttempting to delete user ID: {new_user_id}")
-        self.storage.delete_user(new_user_id)
+    def find_shortest_path_to_ceo(self, user_id):
+        if not self.is_ready:
+            return None
         
-        check_user = self.storage.get_user_by_id(new_user_id)
-        print(f"Deletion successful. User check in hash map: {check_user}")
-
-
-    def run_all_queries(self):
-        self.initialize_data()
-
-        print("\n" + "="*50)
-        print("AVL TREE INDEX QUERIES (Age Range Search)")
-        print("="*50)
+        start_time = time.perf_counter()
+        path_ids = self.storage.hierarchy_graph.path_to_root(user_id)
+        end_time = time.perf_counter()
         
-        self.run_age_range_query(20, 22)
-        self.run_age_range_query(30, 40)
+        if path_ids:
+            path_records = self.storage.get_all_records(path_ids)
+            print(f"Found path of length {len(path_ids)-1} in {(end_time - start_time) * 1000:.3f} ms (O(Depth) Upward Traversal).")
+            return path_records
+        else:
+            return []
+
+    def get_distribution(self, attribute):
+        if not self.is_ready:
+            return {}
         
-        self.run_dynamic_operations()
+        data_values = [
+            record.get(attribute) 
+            for record in self.storage.hash_map.values() 
+            if record.get(attribute) is not None
+        ]
 
-        print("\nAll predefined queries completed.")
-
-
-engine = QueryEngine(DATA_FILE)
-engine.run_all_queries()
-
+        if not data_values:
+            return {}
+        
+        series = pd.Series(data_values)
+        distribution = series.value_counts().to_dict()
+        
+        return distribution
