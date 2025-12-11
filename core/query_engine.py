@@ -1,6 +1,13 @@
 import time
 import pandas as pd
-from collections import Counter
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
+from storage import Storage
 
 class QueryEngine:
     def __init__(self, storage):
@@ -40,7 +47,7 @@ class QueryEngine:
     def compare_linear_search_by_age_range(self, min_age, max_age):
         if not self.is_ready:
             print("System not initialized.")
-            return
+            return []
 
         print(f"--- Performance Comparison for Age Range [{min_age}, {max_age}] ---")
 
@@ -64,12 +71,12 @@ class QueryEngine:
 
     def find_shortest_path_to_ceo(self, user_id):
         if not self.is_ready:
-            return None
+            return []
         
         start_time = time.perf_counter()
         
         path_ids = []
-        current_id = int(user_id) # Ensure the starting ID is an integer
+        current_id = int(user_id)
         
         while current_id is not None:
             record = self.storage.get_user_by_id(current_id)
@@ -80,11 +87,10 @@ class QueryEngine:
             
             manager_id = record.get('manager_id')
             
-            # Type safe casting for manager_id from hash map (which might be float or None)
             if manager_id is not None:
                 manager_id = int(manager_id)
             
-            if manager_id is None or manager_id == current_id:
+            if manager_id is None or manager_id == current_id or manager_id == 0:
                 break
             
             current_id = manager_id
@@ -117,3 +123,31 @@ class QueryEngine:
         distribution = series.value_counts().to_dict()
         
         return distribution
+
+    def get_descriptive_statistics(self, attribute):
+        if not self.is_ready:
+            return {"Error": "System not initialized."}
+        
+        data_values = [
+            record.get(attribute) 
+            for record in self.storage.hash_map.values() 
+            if isinstance(record.get(attribute), (int, float))
+        ]
+
+        if not data_values:
+            return {"Error": f"No numerical data found for attribute '{attribute}'."}
+
+        series = pd.Series(data_values)
+        
+        stats = {
+            "Count": len(series),
+            "Mean": series.mean(),
+            "Median (50th %ile)": series.median(),
+            "Standard Deviation": series.std(),
+            "Minimum": series.min(),
+            "Maximum": series.max(),
+            "Q1 (25th %ile)": series.quantile(0.25),
+            "Q3 (75th %ile)": series.quantile(0.75),
+        }
+        
+        return {k: round(v, 2) if isinstance(v, (int, float)) else v for k, v in stats.items()}

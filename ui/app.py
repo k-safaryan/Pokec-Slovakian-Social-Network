@@ -1,109 +1,132 @@
 import streamlit as st
-import os
-import sys
 import pandas as pd
 import time
+import sys
+import os
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, os.pardir))
+core_path = os.path.join(project_root, 'core')
+data_path = os.path.join(project_root, 'data')
 
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+if core_path not in sys.path:
+    sys.path.append(core_path)
 
-try:
-    from core.storage import Storage
-    from core.query_engine import QueryEngine
-except ImportError:
-    st.error("FATAL: Could not import core modules. Check the project structure.")
-    sys.exit()
-except ModuleNotFoundError as e:
-    st.error(f"FATAL: Missing Python module. Did you run 'pip install pandas' and 'pip install streamlit'? Error: {e}")
-    sys.exit()
+from query_engine import QueryEngine 
+from storage import Storage
 
-DATA_FILE = 'dataset.csv'
-DATA_PATH = os.path.join(project_root, 'data', DATA_FILE) 
+DATA_FILE_PATH = os.path.join(data_path, "dataset.csv") 
 
-@st.cache_resource
-def load_data_and_engine():
-    st.info("Loading 1.6M records and building AVL/Graph indices. This will take several minutes and runs only once.")
-    try:
-        storage = Storage(DATA_PATH)
-        start_time = time.time()
-        storage.initialize()
-        end_time = time.time()
-        engine = QueryEngine(storage)
-        
-        st.success(f"Database loaded successfully! (Time taken: {end_time - start_time:.2f} seconds)")
-        return storage, engine
-    except Exception as e:
-        st.error(f"Error during initialization: {e}")
-        return None, None
+@st.cache_resource(show_spinner=True)
+def initialize_db(path):
+    st.info("Initializing MiniDB: Loading data and building AVL/Graph structures...")
+    storage_instance = Storage(path)
+    storage_instance.initialize() 
+    engine = QueryEngine(storage_instance)
+    st.success(f"MiniDB loaded successfully with {len(engine.storage.hash_map):,} records.")
+    return engine
 
-st.set_page_config(layout="wide", page_title="MiniDB: Pokec Social Network")
-
-st.title("DS & Algo Project(Group 7): Pokec Network Management System")
-
-storage, engine = load_data_and_engine()
-
-if storage and engine:
+def run_app():
+    st.set_page_config(layout="wide")
+    st.title("DS & Algo/Group 7 - Scalable Data Management System")
+    st.markdown("Implemented with **AVL Trees** for indexing and **Graph Algorithms** for relationships.")
     
-    st.header("1. Indexed Search (AVL Tree)")
-    st.markdown("Querying the **Age** index for efficient $\\mathcal{O}(\\log N + K)$ range searches.")
+    db = initialize_db(DATA_FILE_PATH)
 
-    col1, col2, col3 = st.columns(3)
-    min_age = col1.number_input("Minimum Age", min_value=15, max_value=112, value=18)
-    max_age = col2.number_input("Maximum Age", min_value=15, max_value=112, value=25)
-    limit = col3.number_input("Results Limit", min_value=1, max_value=100, value=10)
+    st.sidebar.header("Operations")
+    operation = st.sidebar.selectbox("Select MiniDB Feature", 
+                                     ["Indexed Search & Performance", 
+                                      "Graph Analytics (Hierarchy)",
+                                      "Descriptive Analytics"])
 
-    if st.button("Run Indexed Range Search"):
-        if min_age > max_age:
-            st.warning("Minimum Age must be less than Maximum Age.")
-        else:
-            start_query = time.perf_counter()
-            results = engine.search_by_index_score(min_age, max_age)
-            end_query = time.perf_counter()
+    if operation == "Indexed Search & Performance":
+        st.header("AVL Tree Indexing Demo")
+        
+        st.subheader("1. Point Query: Search by User ID (O(1) Lookup)")
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            search_id = st.number_input("Enter User ID", min_value=1, step=1, key='search_id')
+        with col2:
+            st.markdown("---") 
             
-            st.success(f"Found {len(results):,} records in {((end_query - start_query) * 1000):.3f} ms.")
+        if st.button("Search Record"):
+            record = db.get_record_by_id(search_id)
+            if record:
+                st.dataframe(pd.DataFrame([record]))
+            else:
+                st.warning(f"User ID {search_id} not found.")
+
+        st.markdown("---")
+
+        st.subheader("2. Range Query: Age Range (O(log N + K) AVL Index)")
+        col1, col2 = st.columns(2)
+        with col1:
+            min_age = st.slider("Minimum Age", 18, 100, 20)
+        with col2:
+            max_age = st.slider("Maximum Age", 18, 100, 30)
+        
+        if st.button("Run Performance Comparison"):
+            st.text("Executing queries and comparing timing (check terminal for console output)...")
+            results = db.compare_linear_search_by_age_range(min_age, max_age)
             
+            st.write(f"Found {len(results)} users between ages {min_age} and {max_age}:")
             if results:
-                st.subheader(f"Top {limit} Results:")
-                st.dataframe(pd.DataFrame(results[:limit]), use_container_width=True)
+                st.dataframe(pd.DataFrame(results))
+            else:
+                st.info("No records found in this range.")
 
+    elif operation == "Graph Analytics (Hierarchy)":
+        st.header("Graph Algorithm Demo (BFS)")
 
-    st.markdown("---")
-    
-    st.header("2. Graph Traversal (Path to Root)")
-    st.markdown("Demonstrates pathfinding from any node up to the ultimate network Root.")
-
-    user_id_input = st.number_input("Enter User ID for Path to Root (e.g., 1, 2, or 5):", value=2, step=1)
-    
-    if st.button("Find Path to Root"):
-        start_graph = time.perf_counter()
-        path_records = engine.find_shortest_path_to_ceo(user_id_input)
-        end_graph = time.perf_counter()
+        st.subheader("1. Find Path to CEO (Upward Traversal)")
+        user_id_path = st.number_input("Enter User ID to find hierarchy path:", min_value=1, step=1, key='user_path')
         
-        if path_records:
-            path_ids = [record['user_id'] for record in path_records]
-            st.success(f"Path Found (Length: {len(path_ids)-1}, Time: {((end_graph - start_graph) * 1000):.3f} ms):")
-            st.code(" -> ".join(map(str, path_ids)))
-            st.dataframe(pd.DataFrame(path_records), use_container_width=True)
-        else:
-            st.warning(f"Path not found for user ID {user_id_input}. ID may be the root or an isolated node.")
+        if st.button("Trace Path"):
+            path_records = db.find_shortest_path_to_ceo(user_id_path)
+            if path_records:
+                path_str = " -> ".join([f"{r['user_id']} ({r.get('education', 'N/A')})" for r in path_records])
+                st.success(f"Path Length: {len(path_records) - 1}")
+                st.code(path_str)
+                st.dataframe(pd.DataFrame(path_records))
+            else:
+                st.warning(f"User ID {user_id_path} not found or path cannot be traced.")
 
-    st.markdown("---")
-    
-    st.header("3. Basic Analytics (Data Distribution)")
-    
-    attribute = st.selectbox("Select Attribute for Distribution:", 
-                             ['gender', 'eye_color', 'education', 'languages', 'music'])
-    
-    if st.button("Calculate Distribution"):
-        distribution = engine.get_distribution(attribute)
+        st.markdown("---")
         
-        if distribution:
-            dist_df = pd.DataFrame(distribution.items(), columns=['Value', 'Count']).sort_values('Count', ascending=False).head(10)
+        st.subheader("2. Compound Query: Direct Reports")
+        manager_id = st.number_input("Enter Manager ID", min_value=0, step=1, key='manager_id')
+        if st.button("Get Direct Reports"):
+            report_ids = db.storage.get_direct_reports(manager_id)
+            report_data = db.storage.get_all_records(report_ids)
+            if report_data:
+                st.write(f"Found {len(report_data)} direct reports:")
+                st.dataframe(pd.DataFrame(report_data))
+            else:
+                st.info(f"Manager ID {manager_id} has no direct reports (or is not found).")
             
-            st.success(f"Top 10 Distribution for '{attribute}':")
+    elif operation == "Descriptive Analytics":
+        st.header("Basic Data Analysis")
+        
+        st.subheader("1. Descriptive Statistics (Numerical Fields)")
+        num_attributes = ["age"] 
+        stats_attr = st.selectbox("Select Attribute", num_attributes, key='stats_attr')
+        if st.button("Calculate Statistics"):
+            stats = db.get_descriptive_statistics(stats_attr)
+            st.json(stats)
             
-            st.bar_chart(dist_df, x='Value', y='Count')
-            st.dataframe(dist_df, use_container_width=True)
+        st.markdown("---")
+        
+        st.subheader("2. Value Distribution (Categorical Fields)")
+        cat_attributes = ["gender", "eye_color", "education", "languages", "music"] 
+        dist_attr = st.selectbox("Select Attribute", cat_attributes, key='dist_attr')
+        if st.button("Show Distribution"):
+            distribution = db.get_distribution(dist_attr)
+            
+            if distribution:
+                df_dist = pd.DataFrame(distribution.items(), columns=[dist_attr, 'Count']).sort_values(by='Count', ascending=False)
+                st.dataframe(df_dist)
+                st.bar_chart(df_dist.set_index(dist_attr))
+            else:
+                st.warning(f"No data found for attribute {dist_attr}.")
+
+run_app()

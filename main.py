@@ -1,7 +1,7 @@
 import os
 import sys
-import time
 from collections import deque
+import subprocess
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 if script_dir not in sys.path:
@@ -17,9 +17,9 @@ except ImportError:
 
 DATA_FILE = 'dataset.csv'
 DATA_PATH = os.path.join(script_dir, 'data', DATA_FILE) 
+APP_FILE_PATH = os.path.join(script_dir, 'ui', 'app.py')
 
 def find_valid_graph_ids(storage_instance: Storage):
-    """Dynamically finds a connected pair of IDs for testing."""
     graph = storage_instance.hierarchy_graph
     
     valid_managers = [node for node, reports in graph.adj.items() if reports]
@@ -70,7 +70,7 @@ def run_system_check():
     test_manager, test_direct_report, test_far_node = find_valid_graph_ids(storage)
     
     print("\n" + "=" * 60)
-    print("--- 2. INDEXING EFFICIENCY TEST (PROFESSOR'S REQUIREMENT) ---")
+    print("--- 2. INDEXING EFFICIENCY TEST---")
     print("=" * 60)
     
     engine.compare_linear_search_by_age_range(18, 30)
@@ -139,5 +139,19 @@ def run_system_check():
         print("\nSUCCESS: System passed consistency check.")
     else:
         print("\nFAILURE: Deletion failed or data inconsistency detected.")
+        
+    print("\n" + "=" * 60)
+    print(f"--- 5. LAUNCHING INTERACTIVE UI ---")
+    print(f"Run 'streamlit run {APP_FILE_PATH}' to start the web application.")
+    print("=" * 60)
+
+def launch_ui():
+    try:
+        subprocess.run(["streamlit", "run", APP_FILE_PATH], check=True)
+    except FileNotFoundError:
+        print("ERROR: Streamlit command not found. Please install Streamlit.")
+    except subprocess.CalledProcessError:
+        print("ERROR: Streamlit application failed to run.")
 
 run_system_check()
+launch_ui()

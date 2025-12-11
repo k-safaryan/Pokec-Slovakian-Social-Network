@@ -1,12 +1,9 @@
 import csv
 import sys
 import os
-import collections
 import time
-from typing import List, Dict, Any, Optional
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, os.pardir))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
@@ -63,7 +60,8 @@ class Storage:
                         'eye_color': row.get('eye_color'),
                         'education': row.get('education'),
                         'languages': row.get('languages'),
-                        'music': row.get('music')
+                        'music': row.get('music'),
+                        'manager_id': manager_id
                     }
                     
                     self.hash_map[user_id] = user_data
