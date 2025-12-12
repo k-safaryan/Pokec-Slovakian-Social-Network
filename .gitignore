@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+env/
+
+# OS / IDE junk
+.DS_Store
+*.swp
+
+# Large or generated data
+data/*.csv
+*.so
+*.dll
+*.pkl
+
+# Build artifacts
+*.log
