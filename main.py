@@ -42,11 +42,24 @@ def find_valid_graph_ids(storage_instance: Storage):
         depth += 1
         for _ in range(level_size):
             current = queue.popleft()
+            for neighbor in graph.friends.get(current, []): 
             for neighbor in graph.adj.get(current, []):
                 if neighbor not in visited:
                     visited.add(neighbor)
                     far_node = neighbor
                     if depth >= 2:
+                        return user_A, friend_B, far_node
+                    queue.append(neighbor)
+    
+    return user_A, friend_B, far_node 
+
+def run_system_check():
+    print("-" * 60)
+    print("1. INITIALIZING DATA SYSTEM")
+    print("-" * 60)
+    
+    storage = Storage(DATA_PATH)
+    storage.initialize() 
                         return manager_A, employee_B, far_node
                     queue.append(neighbor)
     
@@ -67,6 +80,19 @@ def run_system_check():
         print("CRITICAL LOGIC ERROR: Initialization failed.")
         return
 
+    test_user, test_friend, test_far_node = find_valid_graph_ids(storage)
+    
+    print("\n" + "-" * 60)
+    print("2. INDEXING EFFICIENCY TEST")
+    print("-" * 60)
+    
+    engine.compare_linear_search_by_age_range(18, 30)
+
+    print("\n" + "-" * 60)
+    print("3. CORE FUNCTIONALITY & PERFORMANCE CHECKS")
+    print("-" * 60)
+    
+    test_user_id = 1 
     test_manager, test_direct_report, test_far_node = find_valid_graph_ids(storage)
     
     print("\n" + "=" * 60)
@@ -121,6 +147,7 @@ def run_system_check():
         'user_id': new_id,
         'gender': 'Male',
         'age': 42,
+        'friends': str(test_user)
         'manager_id': test_manager if test_manager != 0 else 1 
     }
     storage.add_user(new_data)
