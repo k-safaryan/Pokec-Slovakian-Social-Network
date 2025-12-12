@@ -54,7 +54,7 @@ def find_valid_graph_ids(storage_instance: Storage):
 
 def run_system_check():
     print("=" * 60)
-    print("--- 1. INITIALIZING DATA SYSTEM ---")
+    print("1. INITIALIZING DATA SYSTEM ")
     print("=" * 60)
     
     storage = Storage(DATA_PATH)
@@ -70,13 +70,13 @@ def run_system_check():
     test_manager, test_direct_report, test_far_node = find_valid_graph_ids(storage)
     
     print("\n" + "=" * 60)
-    print("--- 2. INDEXING EFFICIENCY TEST (PROFESSOR'S REQUIREMENT) ---")
+    print("2. INDEXING EFFICIENCY TEST")
     print("=" * 60)
     
     engine.compare_linear_search_by_age_range(18, 30)
 
     print("\n" + "=" * 60)
-    print("--- 3. CORE FUNCTIONALITY & PERFORMANCE CHECKS ---")
+    print("3. CORE FUNCTIONALITY & PERFORMANCE CHECKS")
     print("=" * 60)
     
     test_user_id = 1
@@ -111,7 +111,7 @@ def run_system_check():
         print(f"ID {test_manager} has no direct connections.")
         
     print("\n" + "=" * 60)
-    print("--- 4. DATA MUTATION AND CONSISTENCY CHECK ---")
+    print("4. DATA MUTATION AND CONSISTENCY CHECK")
     print("=" * 60)
     
     new_id = 9999999
