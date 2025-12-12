@@ -1,132 +1,140 @@
 import streamlit as st
 import pandas as pd
-import sys
 import os
+import sys
 
-current_file_dir = os.path.dirname(os.path.abspath(__file__)) 
-project_root = os.path.dirname(current_file_dir) 
-core_path = os.path.join(project_root, 'core')
-data_path = os.path.join(project_root, 'data') 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.join(script_dir, '..')
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+    
+from core.storage import Storage
+from core.query_engine import QueryEngine
 
-if core_path not in sys.path:
-    sys.path.append(core_path)
+DATA_FILE = 'dataset.csv'
+RELATIONSHIP_FILE = 'relationships.csv'
+DATA_PATH = os.path.join(project_root, 'data', DATA_FILE)
+RELATIONSHIP_PATH = os.path.join(project_root, 'data', RELATIONSHIP_FILE)
 
-from query_engine import QueryEngine 
-from storage import Storage
 
-DATA_FILE_PATH = os.path.join(data_path, "dataset.csv") 
-
-@st.cache_resource(show_spinner=True)
-def initialize_db(path):
-    st.info("Initializing MiniDB: Loading data and building AVL/Social Graph...")
-    storage_instance = Storage(path)
-    storage_instance.initialize() 
-    engine = QueryEngine(storage_instance)
-    st.success(f"MiniDB loaded successfully with {len(engine.storage.hash_map):,} records.")
-    return engine
+@st.cache_resource(show_spinner="Initializing Database and Building Indexes (This may take a minute...)")
+def initialize_db(data_path: str, relationship_path: str) -> Storage:
+    storage_instance = Storage(data_path, relationship_path)
+    storage_instance.initialize()
+    return storage_instance
 
 def run_app():
-    st.set_page_config(layout="wide")
-    st.title("DS & Algo/Group 7 - Social Network Analytics")
-    st.markdown("Implemented with **AVL Trees** for indexing and **Graph Algorithms** for social connections.")
-    
-    db = initialize_db(DATA_FILE_PATH)
+    st.set_page_config(layout="wide", page_title="Pokec Social Network Analysis")
 
-    st.sidebar.header("Operations")
-    operation = st.sidebar.selectbox("Select MiniDB Feature", 
-                                     ["Indexed Search & Performance", 
-                                      "Social Graph Analytics",
-                                      "Descriptive Analytics"])
+    storage_instance = initialize_db(DATA_PATH, RELATIONSHIP_PATH)
+    query_engine = QueryEngine(storage_instance)
 
-    if operation == "Indexed Search & Performance":
-        st.header("AVL Tree Indexing Demo")
-        
-        st.subheader("1. Point Query: Search by User ID (O(1) Lookup)")
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            search_id = st.number_input("Enter User ID", min_value=1, step=1, key='search_id')
-        with col2:
-            st.markdown("---") 
-            
-        if st.button("Search Record"):
-            record = db.get_record_by_id(search_id)
-            if record:
-                st.dataframe(pd.DataFrame([record]))
-            else:
-                st.warning(f"User ID {search_id} not found.")
+    st.title("Pokec Social Network Analysis")
 
-        st.markdown("---")
+    # --- Sidebar for Navigation ---
+    analysis_type = st.sidebar.radio(
+        "Select Analysis Type",
+        ["Descriptive Analytics", "Search & Retrieval", "Graph Analytics"]
+    )
 
-        st.subheader("2. Range Query: Age Range (O(log N + K) AVL Index)")
+    if analysis_type == "Descriptive Analytics":
+        st.header("Descriptive Analytics")
+        st.markdown("Overview of the dataset distribution.")
+
         col1, col2 = st.columns(2)
+
         with col1:
-            min_age = st.slider("Minimum Age", 18, 100, 20)
+            st.subheader("Gender Distribution")
+            gender_data = query_engine.storage.count_by_gender()
+            gender_df = pd.DataFrame(list(gender_data.items()), columns=['Gender', 'Count'])
+            st.bar_chart(gender_df.set_index('Gender'))
+            
+            st.subheader("Education Distribution (Top 10)")
+            education_data = query_engine.storage.top_educations(10)
+            education_df = pd.DataFrame(education_data, columns=['Education', 'Count'])
+            st.dataframe(education_df, use_container_width=True)
+
         with col2:
-            max_age = st.slider("Maximum Age", 18, 100, 30)
+            st.subheader("Average Age by Gender")
+            age_data = query_engine.storage.average_age_by_gender()
+            age_df = pd.DataFrame(list(age_data.items()), columns=['Gender', 'Average Age'])
+            st.bar_chart(age_df.set_index('Gender'))
+
+            st.subheader("Language Distribution (Top 10)")
+            language_data = query_engine.storage.top_languages(10)
+            language_df = pd.DataFrame(language_data, columns=['Language', 'Count'])
+            st.dataframe(language_df, use_container_width=True)
+
+        st.subheader("Network Metrics")
+        avg_friends = query_engine.storage.average_number_of_friends()
+        med_friends = query_engine.storage.median_number_of_friends()
         
-        if st.button("Run Performance Comparison"):
-            st.text("Executing queries and comparing timing (check terminal for console output)...")
-            results = db.compare_linear_search_by_age_range(min_age, max_age)
+        st.write(f"**Average Number of Friends:** {avg_friends:.2f}")
+        st.write(f"**Median Number of Friends:** {med_friends:.2f}")
+
+        st.subheader("Degree Distribution (Top 10 Most Connected)")
+        most_connected = query_engine.storage.top_k_most_connected(10)
+        conn_df = pd.DataFrame(most_connected, columns=['User ID', 'Connections'])
+        st.dataframe(conn_df, use_container_width=True)
+
+
+    elif analysis_type == "Search & Retrieval":
+        st.header("Indexed Search & Retrieval")
+
+        tab1, tab2 = st.tabs(["Search by User ID (O(1))", "Search by Age Range (O(log N))"])
+
+        with tab1:
+            st.subheader("Lookup User by ID (Hash Map)")
+            user_id = st.number_input("Enter User ID", min_value=1, value=1, step=1)
             
-            st.write(f"Found {len(results)} users between ages {min_age} and {max_age}:")
-            if results:
-                st.dataframe(pd.DataFrame(results))
-            else:
-                st.info("No records found in this range.")
+            if st.button("Search User"):
+                user_record = query_engine.get_record_by_id(user_id)
+                if user_record:
+                    st.dataframe(pd.DataFrame([user_record]), use_container_width=True)
+                else:
+                    st.warning(f"User ID {user_id} not found.")
 
-    elif operation == "Social Graph Analytics":
-        st.header("Graph Algorithm Demo (BFS)")
+        with tab2:
+            st.subheader("Search by Age Range (AVL Tree Index)")
+            col_min, col_max = st.columns(2)
+            with col_min:
+                min_age = st.number_input("Minimum Age", min_value=1, value=18, step=1)
+            with col_max:
+                max_age = st.number_input("Maximum Age", min_value=1, value=25, step=1)
+                
+            if st.button("Search Age Range"):
+                results, time_indexed = query_engine.search_by_index_score(min_age, max_age, return_time=True)
+                
+                st.info(f"Indexed search found {len(results):,} records in {time_indexed:.6f} seconds.")
+                
+                if results:
+                    df = pd.DataFrame(results)
+                    st.dataframe(df.head(100), use_container_width=True)
+                    if len(results) > 100:
+                        st.write(f"Displaying the first 100 of {len(results):,} results.")
 
-        st.subheader("1. Find Shortest Connection (Degrees of Separation)")
-        col1, col2 = st.columns(2)
-        with col1:
-            user_a = st.number_input("User A ID", min_value=1, step=1, key='user_a')
-        with col2:
-            user_b = st.number_input("User B ID", min_value=1, step=1, key='user_b')
-        
-        if st.button("Trace Connection"):
-            path_records = db.find_shortest_path(user_a, user_b)
-            if path_records:
-                path_str = " -> ".join([f"{r['user_id']}" for r in path_records])
-                st.success(f"Connection found! Distance: {len(path_records) - 1}")
-                st.code(path_str)
-                st.dataframe(pd.DataFrame(path_records))
-            else:
-                st.warning(f"No connection found between {user_a} and {user_b}.")
+    elif analysis_type == "Graph Analytics":
+        st.header("Social Graph Analytics")
 
-        st.markdown("---")
-        
-        st.subheader("2. Show User Friends")
-        target_id = st.number_input("Enter User ID to see friends", min_value=1, step=1, key='friend_target')
-        if st.button("Get Friends"):
-            friends = db.get_user_friends(target_id)
-            if friends:
-                st.write(f"Found {len(friends)} friends:")
-                st.dataframe(pd.DataFrame(friends))
-            else:
-                st.info(f"User ID {target_id} has no friends listed (or user not found).")
-            
-    elif operation == "Descriptive Analytics":
-        st.header("Basic Data Analysis")
-        
-        st.subheader("1. Value Distribution (Categorical Fields)")
-        # LANGUAGES ADDED HERE
-        cat_attributes = ["gender", "eye_color", "education", "languages", "music"] 
-        dist_attr = st.selectbox("Select Attribute", cat_attributes, key='dist_attr')
-        if st.button("Show Distribution"):
-            # If the user selects "languages", we can directly call the storage method for efficiency.
-            if dist_attr == "languages":
-                 distribution_list = db.storage.top_languages(top_k=50) # Use top_k=50 for a reasonable display
-                 distribution = dict(distribution_list)
-            else:
-                distribution = db.get_distribution(dist_attr)
-            
-            if distribution:
-                df_dist = pd.DataFrame(distribution.items(), columns=[dist_attr, 'Count']).sort_values(by='Count', ascending=False)
-                st.dataframe(df_dist)
-                st.bar_chart(df_dist.set_index(dist_attr))
-            else:
-                st.warning(f"No data found for attribute {dist_attr}.")
+        st.subheader("Shortest Path (Degrees of Separation)")
+        col_start, col_end = st.columns(2)
+        with col_start:
+            start_id = st.number_input("Source User ID (A)", min_value=1, value=1, step=1)
+        with col_end:
+            end_id = st.number_input("Target User ID (B)", min_value=1, value=100, step=1)
 
-if __name__ == "__main__":
-    run_app()
+        if st.button("Find Path"):
+            path_ids, time_path = query_engine.find_shortest_path_timed(start_id, end_id)
+
+            if path_ids:
+                st.success(f"Path found in {time_path:.6f} seconds. Length: {len(path_ids) - 1} connections.")
+                
+                path_records = storage_instance.get_all_records(path_ids)
+                df = pd.DataFrame(path_records)
+                df['Path Step'] = range(len(df))
+                
+                st.dataframe(df[['Path Step', 'user_id', 'gender', 'age', 'education']], use_container_width=True)
+            else:
+                st.warning(f"No path found between User {start_id} and User {end_id}.")
+
+run_app()

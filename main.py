@@ -16,12 +16,18 @@ except ImportError:
     sys.exit(1)
 
 DATA_FILE = 'dataset.csv'
+RELATIONSHIP_FILE = 'relationships.csv'
 DATA_PATH = os.path.join(script_dir, 'data', DATA_FILE) 
+RELATIONSHIP_PATH = os.path.join(script_dir, 'data', RELATIONSHIP_FILE) 
 APP_FILE_PATH = os.path.join(script_dir, 'ui', 'app.py')
 
 def find_valid_graph_ids(storage_instance: Storage):
     graph = storage_instance.social_graph
     
+    if not graph.friends:
+        print("[DEBUG] CRITICAL: Social graph is empty. Skipping all graph tests.")
+        return 1, 2, 3 
+        
     valid_users = [node for node, friends in graph.friends.items() if friends] 
     
     if not valid_users:
@@ -56,11 +62,11 @@ def find_valid_graph_ids(storage_instance: Storage):
     return user_A, friend_B, far_node 
 
 def run_system_check():
-    print("-" * 60)
-    print("1. INITIALIZING DATA SYSTEM")
-    print("-" * 60)
+    print("=" * 60)
+    print("--- 1. INITIALIZING DATA SYSTEM ---")
+    print("=" * 60)
     
-    storage = Storage(DATA_PATH)
+    storage = Storage(DATA_PATH, RELATIONSHIP_PATH) 
     storage.initialize() 
     engine = QueryEngine(storage) 
     
@@ -70,15 +76,15 @@ def run_system_check():
 
     test_user, test_friend, test_far_node = find_valid_graph_ids(storage)
     
-    print("\n" + "-" * 60)
-    print("2. INDEXING EFFICIENCY TEST")
-    print("-" * 60)
+    print("\n" + "=" * 60)
+    print("--- 2. INDEXING EFFICIENCY TEST---")
+    print("=" * 60)
     
     engine.compare_linear_search_by_age_range(18, 30)
 
-    print("\n" + "-" * 60)
-    print("3. CORE FUNCTIONALITY & PERFORMANCE CHECKS")
-    print("-" * 60)
+    print("\n" + "=" * 60)
+    print("--- 3. CORE FUNCTIONALITY & PERFORMANCE CHECKS ---")
+    print("=" * 60)
     
     test_user_id = 1 
     print(f"\n[Check 3A] O(1) Hash Map Lookup for User ID {test_user_id}:")
@@ -102,9 +108,9 @@ def run_system_check():
     else:
         print(f"ID {test_user} has no friends.")
         
-    print("\n" + "-" * 60)
-    print("4. DATA MUTATION AND CONSISTENCY CHECK")
-    print("-" * 60)
+    print("\n" + "=" * 60)
+    print("--- 4. DATA MUTATION AND CONSISTENCY CHECK ---")
+    print("=" * 60)
     
     new_id = 9999999
     
@@ -131,18 +137,5 @@ def run_system_check():
         print("\nSUCCESS: System passed consistency check.")
     else:
         print("\nFAILURE: Deletion failed or data inconsistency detected.")
-
-    # print("\n" + "-" * 60)
-    # print(f"5. LAUNCHING INTERACTIVE UI")
-    # print(f"Run 'streamlit run {APP_FILE_PATH}' to start the web application.")
-    # print("-" * 60)
-
-# def launch_ui():
-#     try:
-#         subprocess.run(["streamlit", "run", APP_FILE_PATH], check=True)
-#     except FileNotFoundError:
-#         print("ERROR: Streamlit command not found. Please install Streamlit.")
-#     except subprocess.CalledProcessError:
-#         print("ERROR: Streamlit application failed to run.")
 
 run_system_check()

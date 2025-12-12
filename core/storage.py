@@ -10,11 +10,12 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 from indexing import AVLTree
-from graph import Graph 
+from graph import Graph
 
 class Storage:
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str, relationship_path: str):
         self.data_path = data_path
+        self.relationship_path = relationship_path
         self.hash_map: Dict[int, Dict[str, Any]] = {}
         self.age_index = AVLTree()
         self.social_graph = Graph()
@@ -22,6 +23,7 @@ class Storage:
 
     def initialize(self):
         self._load_user_data()
+        self._load_relationships()
         self.is_loaded = True
 
     def _load_user_data(self):
@@ -29,14 +31,14 @@ class Storage:
 
         if not os.path.exists(data_file_path):
             print("=" * 80)
-            print(f"CRITICAL ERROR: Data file not found at: {data_file_path}")
+            print(f"CRITICAL ERROR: User profile file not found at: {data_file_path}")
             print("=" * 80)
             sys.exit(1)
 
         row_count = 0
         update_interval = 100000
 
-        print("Loading data and building social graph...")
+        print("Loading user profile data and building AVL index...")
         start_time = time.time()
 
         with open(data_file_path, "r", encoding="utf-8") as f:
@@ -45,7 +47,7 @@ class Storage:
                 row_count += 1
 
                 if row_count % update_interval == 0:
-                    print(f"Loading data: {row_count:,} records processed...")
+                    print(f"Loading profiles: {row_count:,} records processed...")
 
                 try:
                     raw_user_id = row.get("user_id")
@@ -63,17 +65,6 @@ class Storage:
                         except ValueError:
                             pass
 
-                    friends_raw = row.get("friends", "")
-                    friend_ids: List[int] = []
-                    if friends_raw:
-                        for fid_str in friends_raw.split(";"):
-                            fid_str = fid_str.strip()
-                            if fid_str and fid_str.replace(".", "", 1).isdigit():
-                                try:
-                                    friend_ids.append(int(float(fid_str)))
-                                except ValueError:
-                                    pass
-
                     user_data = {
                         "user_id": user_id,
                         "gender": row.get("gender"),
@@ -89,16 +80,50 @@ class Storage:
                     if age is not None:
                         self.age_index.insert(age, user_id)
 
-                    for fid in friend_ids:
-                        self.social_graph.add_edge(user_id, fid)
-
                 except (ValueError, TypeError, KeyError) as e:
-                    print(f"Skipping bad row {row_count} due to error: {e}")
+                    print(f"Skipping bad profile row {row_count} due to error: {e}")
                     continue
 
         end_time = time.time()
-        print(f"Finished processing {row_count:,} total records.")
-        print(f"Data loaded and Social Graph built. Time taken: {end_time - start_time:.4f} seconds.")
+        print(f"Finished processing {row_count:,} total user profiles.")
+        print(f"User data loaded and AVL Index built. Time taken: {end_time - start_time:.4f} seconds.")
+
+    def _load_relationships(self):
+        relationship_file_path = self.relationship_path
+
+        if not os.path.exists(relationship_file_path):
+            print("=" * 80)
+            print(f"CRITICAL ERROR: Relationship file not found at: {relationship_file_path}")
+            print(f"Social Graph will be empty.")
+            print("=" * 80)
+            return
+
+        edge_count = 0
+        update_interval = 1000000
+
+        print("\nLoading relationships and building Social Graph...")
+        start_time = time.time()
+
+        with open(relationship_file_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                edge_count += 1
+
+                if edge_count % update_interval == 0:
+                    print(f"Loading relationships: {edge_count:,} edges processed...")
+                
+                try:
+                    source_id = int(float(row.get("source_user_id")))
+                    target_id = int(float(row.get("target_user_id")))
+
+                    self.social_graph.add_edge(source_id, target_id)
+
+                except (ValueError, TypeError, KeyError) as e:
+                    pass
+
+        end_time = time.time()
+        print(f"Finished processing {edge_count:,} total relationships.")
+        print(f"Social Graph built. Time taken: {end_time - start_time:.4f} seconds.")
 
     def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         return self.hash_map.get(user_id)
