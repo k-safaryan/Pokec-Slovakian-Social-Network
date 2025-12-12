@@ -1,30 +1,18 @@
 import time
 import pandas as pd
 from collections import Counter
-import sys
-import os
-from typing import List, Dict, Any, Optional
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
-if script_dir not in sys.path:
-    sys.path.append(script_dir)
-
-try:
-    from storage import Storage 
-except ImportError:
-    pass
 
 class QueryEngine:
     def __init__(self, storage):
         self.storage = storage
         self.is_ready = storage.is_loaded
 
-    def get_record_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_record_by_id(self, user_id):
         if not self.is_ready:
             return None
         
         start_time = time.perf_counter()
-        record = self.storage.get_user_by_id(int(user_id))
+        record = self.storage.get_user_by_id(user_id)
         end_time = time.perf_counter()
         
         if record:
@@ -33,7 +21,7 @@ class QueryEngine:
             print(f"Record {user_id} not found.")
         return record
 
-    def search_by_index_score(self, min_score: int, max_score: Optional[int] = None) -> List[Dict[str, Any]]:
+    def search_by_index_score(self, min_score, max_score=None):
         if not self.is_ready:
             return []
             
@@ -49,10 +37,10 @@ class QueryEngine:
         
         return results
 
-    def compare_linear_search_by_age_range(self, min_age: int, max_age: int) -> List[Dict[str, Any]]:
+    def compare_linear_search_by_age_range(self, min_age, max_age):
         if not self.is_ready:
             print("System not initialized.")
-            return []
+            return
 
         print(f"--- Performance Comparison for Age Range [{min_age}, {max_age}] ---")
 
@@ -74,43 +62,22 @@ class QueryEngine:
         
         return indexed_results
 
-    def find_shortest_path(self, user_a: int, user_b: int) -> List[Dict[str, Any]]:
+    def find_shortest_path_to_ceo(self, user_id):
         if not self.is_ready:
-            print("System not initialized.")
-            return []
-
+            return None
+        
         start_time = time.perf_counter()
-
-        path_ids = self.storage.find_shortest_path(int(user_a), int(user_b))
-
-        end_time = time.perf_counter()
-
-        if path_ids:
-            print(
-                f"Shortest path found with {len(path_ids) - 1} hop(s) "
-                f"in {(end_time - start_time) * 1000:.3f} ms (BFS: O(V + E))."
-            )
-            return self.storage.get_all_records(path_ids)
-        else:
-            print(
-                f"No path between {user_a} and {user_b}. "
-                f"Network is disconnected for these users."
-            )
-            return []
-
-    def get_user_friends(self, user_id: int) -> List[Dict[str, Any]]:
-        if not self.is_ready:
-            return []
-            
-        start_time = time.perf_counter()
-        friend_ids = self.storage.get_friends(int(user_id))
-        records = self.storage.get_all_records(friend_ids)
+        path_ids = self.storage.hierarchy_graph.path_to_root(user_id)
         end_time = time.perf_counter()
         
-        print(f"Found {len(records)} friends in {(end_time - start_time) * 1000:.3f} ms.")
-        return records
+        if path_ids:
+            path_records = self.storage.get_all_records(path_ids)
+            print(f"Found path of length {len(path_ids)-1} in {(end_time - start_time) * 1000:.3f} ms (O(Depth) Upward Traversal).")
+            return path_records
+        else:
+            return []
 
-    def get_distribution(self, attribute: str) -> Dict[Any, int]:
+    def get_distribution(self, attribute):
         if not self.is_ready:
             return {}
         
