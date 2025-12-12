@@ -103,6 +103,8 @@ class AVLTree:
         if node:
             try:
                 node.record_ids.remove(record_id)
+                if not node.record_ids:
+                    pass
                 return True
             except ValueError:
                 return False
