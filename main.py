@@ -12,7 +12,7 @@ try:
     from core.query_engine import QueryEngine
     from core.graph import Graph
 except ImportError:
-    print("FATAL: Could not import core modules. Check project structure and __init__.py files.")
+    print("FATAL: Could not import core modules. Check project structure.")
     sys.exit(1)
 
 DATA_FILE = 'dataset.csv'
@@ -20,21 +20,24 @@ DATA_PATH = os.path.join(script_dir, 'data', DATA_FILE)
 APP_FILE_PATH = os.path.join(script_dir, 'ui', 'app.py')
 
 def find_valid_graph_ids(storage_instance: Storage):
-    graph = storage_instance.hierarchy_graph
+    graph = storage_instance.social_graph
     
-    valid_managers = [node for node, reports in graph.adj.items() if reports]
+    valid_users = [node for node, friends in graph.friends.items() if friends] 
     
-    if not valid_managers:
-        print("[DEBUG] CRITICAL: No user in the dataset has any direct reports. Cannot test graph.")
+    if not valid_users:
+        print("[DEBUG] CRITICAL: No user in the dataset has any friends. Cannot test graph.")
         return 0, 0, 0
     
-    manager_A = valid_managers[0]
+    user_A = valid_users[0]
     
-    employee_B = graph.adj[manager_A][0]
+    if not graph.friends.get(user_A):
+        return 0, 0, 0
+        
+    friend_B = graph.friends[user_A][0]
 
-    far_node = employee_B
-    queue = deque([employee_B])
-    visited = {manager_A, employee_B}
+    far_node = friend_B
+    queue = deque([friend_B])
+    visited = {user_A, friend_B}
     depth = 0
     
     while queue and depth < 3:
@@ -42,44 +45,42 @@ def find_valid_graph_ids(storage_instance: Storage):
         depth += 1
         for _ in range(level_size):
             current = queue.popleft()
-            for neighbor in graph.adj.get(current, []):
+            for neighbor in graph.friends.get(current, []): 
                 if neighbor not in visited:
                     visited.add(neighbor)
                     far_node = neighbor
                     if depth >= 2:
-                        return manager_A, employee_B, far_node
+                        return user_A, friend_B, far_node
                     queue.append(neighbor)
     
-    return manager_A, employee_B, employee_B 
+    return user_A, friend_B, far_node 
 
 def run_system_check():
-    print("=" * 60)
-    print("--- 1. INITIALIZING DATA SYSTEM ---")
-    print("=" * 60)
+    print("-" * 60)
+    print("1. INITIALIZING DATA SYSTEM")
+    print("-" * 60)
     
     storage = Storage(DATA_PATH)
-    
     storage.initialize() 
-
     engine = QueryEngine(storage) 
     
     if not engine.is_ready:
         print("CRITICAL LOGIC ERROR: Initialization failed.")
         return
 
-    test_manager, test_direct_report, test_far_node = find_valid_graph_ids(storage)
+    test_user, test_friend, test_far_node = find_valid_graph_ids(storage)
     
-    print("\n" + "=" * 60)
-    print("--- 2. INDEXING EFFICIENCY TEST---")
-    print("=" * 60)
+    print("\n" + "-" * 60)
+    print("2. INDEXING EFFICIENCY TEST")
+    print("-" * 60)
     
     engine.compare_linear_search_by_age_range(18, 30)
 
-    print("\n" + "=" * 60)
-    print("--- 3. CORE FUNCTIONALITY & PERFORMANCE CHECKS ---")
-    print("=" * 60)
+    print("\n" + "-" * 60)
+    print("3. CORE FUNCTIONALITY & PERFORMANCE CHECKS")
+    print("-" * 60)
     
-    test_user_id = 1
+    test_user_id = 1 
     print(f"\n[Check 3A] O(1) Hash Map Lookup for User ID {test_user_id}:")
     engine.get_record_by_id(test_user_id)
 
@@ -87,32 +88,23 @@ def run_system_check():
     print(f"\n[Check 3B] O(log N) Indexed Search for Age {test_age}:")
     engine.search_by_index_score(test_age)
 
-    print(f"\n[Check 3C] Graph Pathfinding (BFS) between {test_manager} and {test_far_node}:")
-    path_ids = storage.hierarchy_graph.shortest_path(test_manager, test_far_node)
+    print(f"\n[Check 3C] Graph Pathfinding (BFS) between {test_user} and {test_far_node}:")
+    path_ids = storage.social_graph.shortest_path(test_user, test_far_node)
     if path_ids:
         print(f"Shortest path found (length {len(path_ids)-1}): {path_ids}")
     else:
-        print(f"Shortest path not found between {test_manager} and {test_far_node}.")
+        print(f"Shortest path not found between {test_user} and {test_far_node}.")
 
-    print(f"\n[Check 3D] Direct Downstream Connections for ID {test_manager}:")
-    reports = storage.get_direct_reports(test_manager)
-    if reports:
-        print(f"ID {test_manager} has {len(reports)} connections: {reports[:5]}...")
-        
-        print(f"\n[Check 3E] Path to Root/CEO for connected ID {test_direct_report}:")
-        path_to_root = engine.find_shortest_path_to_ceo(test_direct_report)
-        if path_to_root:
-            path_ids_root = [record['user_id'] for record in path_to_root]
-            print(f"Path (Root -> Employee): {path_ids_root}")
-        else:
-            print(f"Path to Root not found for employee {test_direct_report}.")
-
+    print(f"\n[Check 3D] Get Friends for ID {test_user}:")
+    friends = storage.get_friends(test_user)
+    if friends:
+        print(f"ID {test_user} has {len(friends)} friends: {friends[:5]}...")
     else:
-        print(f"ID {test_manager} has no direct connections.")
+        print(f"ID {test_user} has no friends.")
         
-    print("\n" + "=" * 60)
-    print("--- 4. DATA MUTATION AND CONSISTENCY CHECK ---")
-    print("=" * 60)
+    print("\n" + "-" * 60)
+    print("4. DATA MUTATION AND CONSISTENCY CHECK")
+    print("-" * 60)
     
     new_id = 9999999
     
@@ -121,7 +113,7 @@ def run_system_check():
         'user_id': new_id,
         'gender': 'Male',
         'age': 42,
-        'manager_id': test_manager if test_manager != 0 else 1 
+        'friends': str(test_user)
     }
     storage.add_user(new_data)
     print(f"Insertion verified: {storage.get_user_by_id(new_id) is not None}")
@@ -130,7 +122,7 @@ def run_system_check():
     storage.delete_user(new_id)
     
     hash_map_ok = storage.get_user_by_id(new_id) is None
-    graph_ok = new_id not in storage.hierarchy_graph.nodes
+    graph_ok = new_id not in storage.social_graph.nodes
     
     print(f"Removed from Hash Map: {hash_map_ok}")
     print(f"Removed from Graph Nodes: {graph_ok}")
@@ -139,19 +131,18 @@ def run_system_check():
         print("\nSUCCESS: System passed consistency check.")
     else:
         print("\nFAILURE: Deletion failed or data inconsistency detected.")
-        
-    print("\n" + "=" * 60)
-    print(f"--- 5. LAUNCHING INTERACTIVE UI ---")
-    print(f"Run 'streamlit run {APP_FILE_PATH}' to start the web application.")
-    print("=" * 60)
 
-def launch_ui():
-    try:
-        subprocess.run(["streamlit", "run", APP_FILE_PATH], check=True)
-    except FileNotFoundError:
-        print("ERROR: Streamlit command not found. Please install Streamlit.")
-    except subprocess.CalledProcessError:
-        print("ERROR: Streamlit application failed to run.")
+    # print("\n" + "-" * 60)
+    # print(f"5. LAUNCHING INTERACTIVE UI")
+    # print(f"Run 'streamlit run {APP_FILE_PATH}' to start the web application.")
+    # print("-" * 60)
+
+# def launch_ui():
+#     try:
+#         subprocess.run(["streamlit", "run", APP_FILE_PATH], check=True)
+#     except FileNotFoundError:
+#         print("ERROR: Streamlit command not found. Please install Streamlit.")
+#     except subprocess.CalledProcessError:
+#         print("ERROR: Streamlit application failed to run.")
 
 run_system_check()
-launch_ui()

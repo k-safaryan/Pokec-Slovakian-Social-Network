@@ -1,20 +1,25 @@
 import time
 import pandas as pd
+from collections import Counter
 import sys
 import os
+from typing import List, Dict, Any, Optional
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if script_dir not in sys.path:
+    sys.path.append(script_dir)
 
-from storage import Storage
+try:
+    from storage import Storage 
+except ImportError:
+    pass
 
 class QueryEngine:
     def __init__(self, storage):
         self.storage = storage
         self.is_ready = storage.is_loaded
 
-    def get_record_by_id(self, user_id):
+    def get_record_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         if not self.is_ready:
             return None
         
@@ -28,7 +33,7 @@ class QueryEngine:
             print(f"Record {user_id} not found.")
         return record
 
-    def search_by_index_score(self, min_score, max_score=None):
+    def search_by_index_score(self, min_score: int, max_score: Optional[int] = None) -> List[Dict[str, Any]]:
         if not self.is_ready:
             return []
             
@@ -44,7 +49,7 @@ class QueryEngine:
         
         return results
 
-    def compare_linear_search_by_age_range(self, min_age, max_age):
+    def compare_linear_search_by_age_range(self, min_age: int, max_age: int) -> List[Dict[str, Any]]:
         if not self.is_ready:
             print("System not initialized.")
             return []
@@ -69,44 +74,43 @@ class QueryEngine:
         
         return indexed_results
 
-    def find_shortest_path_to_ceo(self, user_id):
+    def find_shortest_path(self, user_a: int, user_b: int) -> List[Dict[str, Any]]:
         if not self.is_ready:
-            return []
-        
-        start_time = time.perf_counter()
-        
-        path_ids = []
-        current_id = int(user_id)
-        
-        while current_id is not None:
-            record = self.storage.get_user_by_id(current_id)
-            if record is None:
-                break
-                
-            path_ids.append(current_id)
-            
-            manager_id = record.get('manager_id')
-            
-            if manager_id is not None:
-                manager_id = int(manager_id)
-            
-            if manager_id is None or manager_id == current_id or manager_id == 0:
-                break
-            
-            current_id = manager_id
-            
-        path_ids.reverse()
-        
-        end_time = time.perf_counter()
-        
-        if path_ids:
-            path_records = self.storage.get_all_records(path_ids)
-            print(f"Found path of length {len(path_ids)-1} in {(end_time - start_time) * 1000:.3f} ms (O(Depth) Upward Traversal).")
-            return path_records
-        else:
+            print("System not initialized.")
             return []
 
-    def get_distribution(self, attribute):
+        start_time = time.perf_counter()
+
+        path_ids = self.storage.find_shortest_path(int(user_a), int(user_b))
+
+        end_time = time.perf_counter()
+
+        if path_ids:
+            print(
+                f"Shortest path found with {len(path_ids) - 1} hop(s) "
+                f"in {(end_time - start_time) * 1000:.3f} ms (BFS: O(V + E))."
+            )
+            return self.storage.get_all_records(path_ids)
+        else:
+            print(
+                f"No path between {user_a} and {user_b}. "
+                f"Network is disconnected for these users."
+            )
+            return []
+
+    def get_user_friends(self, user_id: int) -> List[Dict[str, Any]]:
+        if not self.is_ready:
+            return []
+            
+        start_time = time.perf_counter()
+        friend_ids = self.storage.get_friends(int(user_id))
+        records = self.storage.get_all_records(friend_ids)
+        end_time = time.perf_counter()
+        
+        print(f"Found {len(records)} friends in {(end_time - start_time) * 1000:.3f} ms.")
+        return records
+
+    def get_distribution(self, attribute: str) -> Dict[Any, int]:
         if not self.is_ready:
             return {}
         
@@ -123,31 +127,3 @@ class QueryEngine:
         distribution = series.value_counts().to_dict()
         
         return distribution
-
-    def get_descriptive_statistics(self, attribute):
-        if not self.is_ready:
-            return {"Error": "System not initialized."}
-        
-        data_values = [
-            record.get(attribute) 
-            for record in self.storage.hash_map.values() 
-            if isinstance(record.get(attribute), (int, float))
-        ]
-
-        if not data_values:
-            return {"Error": f"No numerical data found for attribute '{attribute}'."}
-
-        series = pd.Series(data_values)
-        
-        stats = {
-            "Count": len(series),
-            "Mean": series.mean(),
-            "Median (50th %ile)": series.median(),
-            "Standard Deviation": series.std(),
-            "Minimum": series.min(),
-            "Maximum": series.max(),
-            "Q1 (25th %ile)": series.quantile(0.25),
-            "Q3 (75th %ile)": series.quantile(0.75),
-        }
-        
-        return {k: round(v, 2) if isinstance(v, (int, float)) else v for k, v in stats.items()}

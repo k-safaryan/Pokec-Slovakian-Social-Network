@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
-import time
 import sys
 import os
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, os.pardir))
+current_file_dir = os.path.dirname(os.path.abspath(__file__)) 
+project_root = os.path.dirname(current_file_dir) 
 core_path = os.path.join(project_root, 'core')
-data_path = os.path.join(project_root, 'data')
+data_path = os.path.join(project_root, 'data') 
 
 if core_path not in sys.path:
     sys.path.append(core_path)
@@ -19,7 +18,7 @@ DATA_FILE_PATH = os.path.join(data_path, "dataset.csv")
 
 @st.cache_resource(show_spinner=True)
 def initialize_db(path):
-    st.info("Initializing MiniDB: Loading data and building AVL/Graph structures...")
+    st.info("Initializing MiniDB: Loading data and building AVL/Social Graph...")
     storage_instance = Storage(path)
     storage_instance.initialize() 
     engine = QueryEngine(storage_instance)
@@ -28,15 +27,15 @@ def initialize_db(path):
 
 def run_app():
     st.set_page_config(layout="wide")
-    st.title("DS & Algo/Group 7 - Scalable Data Management System")
-    st.markdown("Implemented with **AVL Trees** for indexing and **Graph Algorithms** for relationships.")
+    st.title("DS & Algo/Group 7 - Social Network Analytics")
+    st.markdown("Implemented with **AVL Trees** for indexing and **Graph Algorithms** for social connections.")
     
     db = initialize_db(DATA_FILE_PATH)
 
     st.sidebar.header("Operations")
     operation = st.sidebar.selectbox("Select MiniDB Feature", 
                                      ["Indexed Search & Performance", 
-                                      "Graph Analytics (Hierarchy)",
+                                      "Social Graph Analytics",
                                       "Descriptive Analytics"])
 
     if operation == "Indexed Search & Performance":
@@ -75,52 +74,52 @@ def run_app():
             else:
                 st.info("No records found in this range.")
 
-    elif operation == "Graph Analytics (Hierarchy)":
+    elif operation == "Social Graph Analytics":
         st.header("Graph Algorithm Demo (BFS)")
 
-        st.subheader("1. Find Path to CEO (Upward Traversal)")
-        user_id_path = st.number_input("Enter User ID to find hierarchy path:", min_value=1, step=1, key='user_path')
+        st.subheader("1. Find Shortest Connection (Degrees of Separation)")
+        col1, col2 = st.columns(2)
+        with col1:
+            user_a = st.number_input("User A ID", min_value=1, step=1, key='user_a')
+        with col2:
+            user_b = st.number_input("User B ID", min_value=1, step=1, key='user_b')
         
-        if st.button("Trace Path"):
-            path_records = db.find_shortest_path_to_ceo(user_id_path)
+        if st.button("Trace Connection"):
+            path_records = db.find_shortest_path(user_a, user_b)
             if path_records:
-                path_str = " -> ".join([f"{r['user_id']} ({r.get('education', 'N/A')})" for r in path_records])
-                st.success(f"Path Length: {len(path_records) - 1}")
+                path_str = " -> ".join([f"{r['user_id']}" for r in path_records])
+                st.success(f"Connection found! Distance: {len(path_records) - 1}")
                 st.code(path_str)
                 st.dataframe(pd.DataFrame(path_records))
             else:
-                st.warning(f"User ID {user_id_path} not found or path cannot be traced.")
+                st.warning(f"No connection found between {user_a} and {user_b}.")
 
         st.markdown("---")
         
-        st.subheader("2. Compound Query: Direct Reports")
-        manager_id = st.number_input("Enter Manager ID", min_value=0, step=1, key='manager_id')
-        if st.button("Get Direct Reports"):
-            report_ids = db.storage.get_direct_reports(manager_id)
-            report_data = db.storage.get_all_records(report_ids)
-            if report_data:
-                st.write(f"Found {len(report_data)} direct reports:")
-                st.dataframe(pd.DataFrame(report_data))
+        st.subheader("2. Show User Friends")
+        target_id = st.number_input("Enter User ID to see friends", min_value=1, step=1, key='friend_target')
+        if st.button("Get Friends"):
+            friends = db.get_user_friends(target_id)
+            if friends:
+                st.write(f"Found {len(friends)} friends:")
+                st.dataframe(pd.DataFrame(friends))
             else:
-                st.info(f"Manager ID {manager_id} has no direct reports (or is not found).")
+                st.info(f"User ID {target_id} has no friends listed (or user not found).")
             
     elif operation == "Descriptive Analytics":
         st.header("Basic Data Analysis")
         
-        st.subheader("1. Descriptive Statistics (Numerical Fields)")
-        num_attributes = ["age"] 
-        stats_attr = st.selectbox("Select Attribute", num_attributes, key='stats_attr')
-        if st.button("Calculate Statistics"):
-            stats = db.get_descriptive_statistics(stats_attr)
-            st.json(stats)
-            
-        st.markdown("---")
-        
-        st.subheader("2. Value Distribution (Categorical Fields)")
+        st.subheader("1. Value Distribution (Categorical Fields)")
+        # LANGUAGES ADDED HERE
         cat_attributes = ["gender", "eye_color", "education", "languages", "music"] 
         dist_attr = st.selectbox("Select Attribute", cat_attributes, key='dist_attr')
         if st.button("Show Distribution"):
-            distribution = db.get_distribution(dist_attr)
+            # If the user selects "languages", we can directly call the storage method for efficiency.
+            if dist_attr == "languages":
+                 distribution_list = db.storage.top_languages(top_k=50) # Use top_k=50 for a reasonable display
+                 distribution = dict(distribution_list)
+            else:
+                distribution = db.get_distribution(dist_attr)
             
             if distribution:
                 df_dist = pd.DataFrame(distribution.items(), columns=[dist_attr, 'Count']).sort_values(by='Count', ascending=False)
@@ -129,4 +128,5 @@ def run_app():
             else:
                 st.warning(f"No data found for attribute {dist_attr}.")
 
-run_app()
+if __name__ == "__main__":
+    run_app()
