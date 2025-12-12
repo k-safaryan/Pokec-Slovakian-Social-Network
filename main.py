@@ -147,7 +147,7 @@ def run_system_check():
         'user_id': new_id,
         'gender': 'Male',
         'age': 42,
-        'friends': str(test_user)
+        'friends': str(test_user),
         'manager_id': test_manager if test_manager != 0 else 1 
     }
     storage.add_user(new_data)
