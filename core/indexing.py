@@ -1,6 +1,6 @@
 class AVLNode:
     def __init__(self, key, record_id):
-        self.key = key          # The indexing key (e.g., index_score)
+        self.key = key
         self.record_ids = [record_id]
         self.left = None
         self.right = None
@@ -21,8 +21,8 @@ class AVLTree:
     def _rotate_left(self, z):
         y = z.right
         T2 = y.left
-        y.left = z
         z.right = T2
+        y.left = z
         self._update_height(z)
         self._update_height(y)
         return y
@@ -30,12 +30,12 @@ class AVLTree:
     def _rotate_right(self, z):
         y = z.left
         T3 = y.right
-        y.right = z
         z.left = T3
+        y.right = z
         self._update_height(z)
         self._update_height(y)
         return y
-    
+
     def insert(self, key, record_id):
         self.root = self._insert_recursive(self.root, key, record_id)
 
@@ -103,6 +103,8 @@ class AVLTree:
         if node:
             try:
                 node.record_ids.remove(record_id)
+                if not node.record_ids:
+                    pass
                 return True
             except ValueError:
                 return False
